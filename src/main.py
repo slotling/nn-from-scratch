@@ -14,11 +14,14 @@ y_test = np.zeros((y_test_raw.shape[0], y_test_raw.max()+1))
 y_train[np.arange(y_train_raw.shape[0]), y_train_raw] = 1
 y_test[np.arange(y_test_raw.shape[0]), y_test_raw] = 1
 
-model = md.Model([X_train.shape[1], 16, 16, y_train.shape[1]])
-model.train(X_train, y_train)
-
-print(model.predict(X_train[0]), y_train[0])
+models = []
 
 import matplotlib.pyplot as plt
-plt.plot(model.debug_cost_list)
+for alpha in [10, 0.01, 0.1, 1]:
+    model = md.Model([X_train.shape[1], 64, 64, y_train.shape[1]])
+    model.train(X_train, y_train, alpha=alpha)
+
+    plt.plot(model.debug_cost_list, label=f"alpha = {alpha}")
+
+plt.legend()
 plt.show()

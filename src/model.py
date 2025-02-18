@@ -4,11 +4,13 @@ import emath as em
 
 class LayerData:
     def __init__(self, neurons: int, prev_neurons: int, is_input_layer=False, random=False):
+        rng = np.random.RandomState(1)
+
         self.activations: np.ndarray = np.full((neurons, ), 0.)
         if not is_input_layer:
             if random: 
-                self.weights: np.ndarray = np.random.randn(neurons, prev_neurons)
-                self.biases: np.ndarray = np.random.randn(neurons)
+                self.weights: np.ndarray = rng.randn(neurons, prev_neurons)
+                self.biases: np.ndarray = rng.randn(neurons)
             else:
                 self.weights: np.ndarray = np.full((neurons, prev_neurons), 0.)
                 self.biases: np.ndarray = np.full((neurons, ), 0.)
@@ -72,10 +74,10 @@ class Model:
 
         return self.layers[-1].values.activations
     
-    def train(self, inputs: np.ndarray, outputs: np.ndarray, epoches=2000):
+    def train(self, inputs: np.ndarray, outputs: np.ndarray, alpha=0.01, epoches=200):
         with alive_bar(epoches * (inputs.shape[0] + len(self.layers)-1)) as bar:
             for i in range(epoches):
-                self.train_epoch(inputs, outputs, bar, i)
+                self.train_epoch(inputs, outputs, alpha=alpha, bar=bar, epoch=i)
         
     def evaluate(self, inputs: np.ndarray, outputs: np.ndarray):
         acc = 0
@@ -96,7 +98,7 @@ class Model:
 
         return acc, cost
     
-    def train_epoch(self, inputs: np.ndarray, outputs: np.ndarray, bar, epoch):
+    def train_epoch(self, inputs: np.ndarray, outputs: np.ndarray, alpha:np.float64, bar, epoch):
         for i, LAYER in enumerate(self.layers):
             if i == 0:
                 continue
@@ -107,8 +109,7 @@ class Model:
             self.train_iter(input, output)
 
             bar()
-        
-        alpha = 0.01
+
         for i, LAYER in enumerate(self.layers):
             if i == 0:
                 continue
@@ -165,6 +166,6 @@ class Model:
                     CHANGE.weights[current_index][preceding_index] = CHANGE.weighted_sum[current_index] * PRECEDING_LAYER.values.activations[preceding_index]
 
             # 4. bias changes
-            CHANGE.biases = CHANGE.weighted_sum * 1
+            CHANGE.biases = CHANGE.weighted_sum
 
             LAYER.changes.append(CHANGE)

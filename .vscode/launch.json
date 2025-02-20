@@ -10,6 +10,13 @@
             "request": "launch",
             "program": "${workspaceFolder}/src/main.py",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Python Debuggers: test.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/test.py",
+            "console": "integratedTerminal"
         }
     ]
 }

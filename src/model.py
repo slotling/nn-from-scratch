@@ -104,11 +104,15 @@ class Model:
                 continue
             LAYER.changes = []
 
+        pass
+
         for i, input in enumerate(inputs):
             output = outputs[i]
             self.train_iter(input, output)
 
             bar()
+
+        pass
 
         for i, LAYER in enumerate(self.layers):
             if i == 0:
@@ -156,7 +160,7 @@ class Model:
                     for succeeding_index in range(SUCCEEDING_LAYER.neurons):
                         CHANGE.activations[current_index] += SUCCEEDING_CHANGE.weighted_sum[succeeding_index] * SUCCEEDING_LAYER.values.weights[succeeding_index][current_index]
 
-            # 2. weighted sum changes (LOOK AGAIN)
+            # 2. weighted sum changes
             CHANGE.weighted_sum = np.multiply(CHANGE.activations, em.sigmoid_derivative(LAYER.values.weighted_sum))
             
             # 3. weight changes

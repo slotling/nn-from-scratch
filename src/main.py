@@ -20,8 +20,6 @@ import matplotlib.pyplot as plt
 for alpha in [10, 0.01, 0.1, 1]:
     model = md.Model([X_train.shape[1], 64, 64, y_train.shape[1]])
     model.train(X_train, y_train, alpha=alpha)
-
     plt.plot(model.debug_cost_list, label=f"alpha = {alpha}")
-
 plt.legend()
 plt.show()

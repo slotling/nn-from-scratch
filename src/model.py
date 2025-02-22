@@ -3,24 +3,37 @@ import numpy as np
 import emath as em
 
 class LayerData:
-    def __init__(self, neurons: int, prev_neurons: int, is_input_layer=False, random=False):
+    def __init__(self, neurons: int, prev_neurons: int, is_input_layer=False, activations=None, weights=None, biases=None, weighted_sum=None, random=False):
         rng = np.random.RandomState(1)
 
-        self.activations: np.ndarray = np.full((neurons, ), 0.)
+        self.activations: np.ndarray = np.full((neurons, ), 0.) if activations==None else activations
+        
         if not is_input_layer:
             if random: 
-                self.weights: np.ndarray = rng.randn(neurons, prev_neurons)
-                self.biases: np.ndarray = rng.randn(neurons)
+                self.weights: np.ndarray = rng.randn(neurons, prev_neurons) if weights==None else weights
+                self.biases: np.ndarray = rng.randn(neurons) if biases==None else biases
             else:
-                self.weights: np.ndarray = np.full((neurons, prev_neurons), 0.)
-                self.biases: np.ndarray = np.full((neurons, ), 0.)
+                self.weights: np.ndarray = np.full((neurons, prev_neurons), 0.) if weights==None else weights
+                self.biases: np.ndarray = np.full((neurons, ), 0.) if biases==None else biases
 
-            self.weighted_sum: np.ndarray = np.full((neurons, ), 0.)
+            self.weighted_sum: np.ndarray = np.full((neurons, ), 0.) if weighted_sum==None else weighted_sum
+
+            if self.weights.shape != (neurons, prev_neurons):
+                raise Exception("Incorrect weights shape")
+    
+            if self.biases.shape != (neurons, ):
+                raise Exception("Incorrect biases shape")
+            
+            if self.weighted_sum.shape != (neurons, ):
+                raise Exception("Incorrect weighted sum shape")
+        
+        if self.activations.shape != (neurons, ):
+            raise Exception("Incorrect activations shape")
 
 class Layer:
-    def __init__(self, neurons: int, prev_neurons: int | None):
+    def __init__(self, neurons: int, prev_neurons: int | None, values: LayerData | None = None):
         self.is_input_layer:bool = prev_neurons == None
-        self.values: LayerData = LayerData(neurons, prev_neurons, self.is_input_layer, random=True)
+        self.values: LayerData = LayerData(neurons, prev_neurons, self.is_input_layer, random=True) if values == None else values
         
         if not self.is_input_layer:
             self.changes: list[LayerData] = []
@@ -39,27 +52,27 @@ class Layer:
             raise Exception("Can't calculate activations in input layer")
         
         if prev_activations.shape == (1,):
-            self.values.weighted_sum = (self.values.weights * prev_activations[0]).reshape(-1)
+            self.values.weighted_sum = (self.values.weights * prev_activations[0]).reshape(-1) + self.values.biases
         else:
-            self.values.weighted_sum = np.dot(self.values.weights, prev_activations)
+            self.values.weighted_sum = np.dot(self.values.weights, prev_activations) + self.values.biases
         self.values.activations = em.sigmoid(self.values.weighted_sum)
 
 class Model:
-    def __init__(self, neurons_list: list[int]):
+    def __init__(self, neurons_list: list[int], values_list: None | list[LayerData] = None):
         self.layers: list[Layer] = []
         for i, count in enumerate(neurons_list):
             layer: Layer = None
             if i == 0:
-                layer = Layer(count, None)
+                layer = Layer(count, None, values=None if values_list == None else values_list[i])
             else:
-                layer = Layer(count, neurons_list[i-1])
+                layer = Layer(count, neurons_list[i-1], values=None if values_list == None else values_list[i])
             
             self.layers.append(layer)
 
         self.debug_cost_list = []
     
-    def predict(self, input: np.ndarray) -> np.ndarray:
-        self.layers[0].input_data(input)
+    def calculate_and_predict(self, input: np.ndarray) -> np.ndarray:
+        # FEEDFORWARD
         for i, LAYER in enumerate(self.layers):
             if i == 0:
                 continue
@@ -85,7 +98,7 @@ class Model:
 
         for i, input in enumerate(inputs):
             output = outputs[i]
-            prediction = self.predict(input)
+            prediction = self.calculate_and_predict(input)
 
             choice_index = prediction.argmax(axis=0)
             if output[choice_index] == 1:
@@ -132,11 +145,17 @@ class Model:
         acc, cost = self.evaluate(inputs, outputs)
         self.debug_cost_list.append(cost)
 
+        try:
+            if self.debug_cost_list[-1] == self.debug_cost_list[-2]:
+                pass
+        except:
+            pass
+
         bar.text(f"acc: {acc}, cost: {cost}, iter: {epoch}")
         
     
     def train_iter(self, input: np.ndarray, output: np.ndarray):
-        prediction = self.predict(input)
+        prediction = self.calculate_and_predict(input)
         raw_costs = prediction - output
 
         start_layer_index = len(self.layers)-1
@@ -173,3 +192,4 @@ class Model:
             CHANGE.biases = CHANGE.weighted_sum
 
             LAYER.changes.append(CHANGE)
+            pass

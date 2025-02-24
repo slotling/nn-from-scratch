@@ -31,7 +31,7 @@ class LayerData:
             raise Exception("Incorrect activations shape")
 
 class Layer:
-    def __init__(self, neurons: int, prev_neurons: int | None, values: LayerData | None = None):
+    def __init__(self, neurons: int, prev_neurons: int | None, activation="sigmoid", values: LayerData | None = None):
         self.is_input_layer:bool = prev_neurons == None
         self.values: LayerData = LayerData(neurons, prev_neurons, self.is_input_layer, random=True) if values == None else values
         
@@ -40,6 +40,7 @@ class Layer:
 
         self.neurons = neurons
         self.prev_neurons = prev_neurons
+        self.activation_function = activation
 
     def input_data(self, data: np.ndarray):
         if not self.is_input_layer:
@@ -55,7 +56,9 @@ class Layer:
             self.values.weighted_sum = (self.values.weights * prev_activations[0]).reshape(-1) + self.values.biases
         else:
             self.values.weighted_sum = np.dot(self.values.weights, prev_activations) + self.values.biases
-        self.values.activations = em.sigmoid(self.values.weighted_sum)
+        
+        if self.activation_function == "sigmoid":
+            self.values.activations = em.sigmoid(self.values.weighted_sum)
 
 class Model:
     def __init__(self, neurons_list: list[int], values_list: None | list[LayerData] = None):
@@ -133,23 +136,18 @@ class Model:
             
             weights_changes = np.array([])
             biases_changes = np.array([])
-            for CHANGE in LAYER.changes:
-                weights_changes = np.append(weights_changes, CHANGE.weights)
-                biases_changes = np.append(biases_changes, CHANGE.biases)
+
+            weights_changes = np.array([CHANGE.weights for CHANGE in LAYER.changes])
+            biases_changes = np.array([CHANGE.biases for CHANGE in LAYER.changes])
+            pass
 
             LAYER.values.weights -= np.average(weights_changes, axis=0) * alpha
-            LAYER.values.biases -= np.average(weights_changes, axis=0) * alpha
+            LAYER.values.biases -= np.average(biases_changes, axis=0) * alpha
 
             bar()
         
         acc, cost = self.evaluate(inputs, outputs)
         self.debug_cost_list.append(cost)
-
-        try:
-            if self.debug_cost_list[-1] == self.debug_cost_list[-2]:
-                pass
-        except:
-            pass
 
         bar.text(f"acc: {acc}, cost: {cost}, iter: {epoch}")
         
@@ -180,8 +178,9 @@ class Model:
                         CHANGE.activations[current_index] += SUCCEEDING_CHANGE.weighted_sum[succeeding_index] * SUCCEEDING_LAYER.values.weights[succeeding_index][current_index]
 
             # 2. weighted sum changes
-            CHANGE.weighted_sum = np.multiply(CHANGE.activations, em.sigmoid_derivative(LAYER.values.weighted_sum))
-            
+            if LAYER.activation_function == "sigmoid":
+                CHANGE.weighted_sum = np.multiply(CHANGE.activations, em.sigmoid_derivative(LAYER.values.weighted_sum))
+
             # 3. weight changes
             PRECEDING_LAYER = self.layers[layer_index-1]
             for current_index in range(LAYER.neurons):

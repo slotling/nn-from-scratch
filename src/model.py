@@ -78,13 +78,11 @@ class Model:
         # FEEDFORWARD
         for i, LAYER in enumerate(self.layers):
             if i == 0:
+                LAYER.input_data(input)
                 continue
 
             prev_layer = self.layers[i-1]
             prev_activations = prev_layer.values.activations
-
-            if i==1:
-                pass
             
             LAYER.calculate(prev_activations)
 
@@ -133,9 +131,6 @@ class Model:
         for i, LAYER in enumerate(self.layers):
             if i == 0:
                 continue
-            
-            weights_changes = np.array([])
-            biases_changes = np.array([])
 
             weights_changes = np.array([CHANGE.weights for CHANGE in LAYER.changes])
             biases_changes = np.array([CHANGE.biases for CHANGE in LAYER.changes])

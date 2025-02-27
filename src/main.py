@@ -17,9 +17,9 @@ y_test[np.arange(y_test_raw.shape[0]), y_test_raw] = 1
 models = []
 
 import matplotlib.pyplot as plt
-for alpha in [10, 0.01, 0.1, 1]:
+for alpha in [1]:
     model = md.Model([X_train.shape[1], 16, 16, y_train.shape[1]])
-    model.train(X_train, y_train, alpha=alpha, epoches=10)
+    model.train(X_train, y_train, alpha=alpha, epoches=100)
     print(model.calculate_and_predict(X_test[0]), y_test[0])
     plt.plot(model.debug_cost_list, label=f"alpha = {alpha}")
 plt.legend()

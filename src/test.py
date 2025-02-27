@@ -9,8 +9,10 @@ X_train = np.array(np.full((2, 2), 0))
 y_train = np.array(np.full((2, 100), 0))
 y_train[0][0] = 1
 
-X_train[0][0] = 1
+X_train[1][0] = 1
 y_train[1][1] = 1
+
+print(X_train, y_train)
 
 models = []
 

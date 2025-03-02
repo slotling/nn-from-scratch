@@ -18,7 +18,7 @@ models = []
 
 import matplotlib.pyplot as plt
 for alpha in [0.1, 1]:
-    model = md.Model([X_train.shape[1], 16, 16, y_train.shape[1]])
+    model = md.Model([X_train.shape[1], 16, 16, y_train.shape[1]], activation_list=["sigmoid", "sigmoid", "sigmoid", "softmax"], cost_function="cross_entropy")
     model.train(X_train, y_train, alpha=alpha)
     print(model.calculate_and_predict(X_train[0]))
     print(model.calculate_and_predict(X_train[1]))

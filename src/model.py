@@ -59,19 +59,33 @@ class Layer:
         
         if self.activation_function == "sigmoid":
             self.values.activations = em.sigmoid(self.values.weighted_sum)
+        elif self.activation_function == "softmax":
+            self.values.activations = em.softmax(self.values.weighted_sum)
 
 class Model:
-    def __init__(self, neurons_list: list[int], values_list: None | list[LayerData] = None):
+    def __init__(self, neurons_list: list[int], values_list: None | list[LayerData] = None, activation_list: None | list[LayerData] = None, cost_function="cross_entropy"):
         self.layers: list[Layer] = []
         for i, count in enumerate(neurons_list):
             layer: Layer = None
             if i == 0:
-                layer = Layer(count, None, values=None if values_list == None else values_list[i])
+                values = None if values_list == None else values_list[i]
+                activation = "sigmoid" if activation_list == None else activation_list[i]
+
+                layer = Layer(count, 
+                              None, 
+                              values=values,
+                              activation=activation
+                              )
             else:
-                layer = Layer(count, neurons_list[i-1], values=None if values_list == None else values_list[i])
+                layer = Layer(count, 
+                              neurons_list[i-1], 
+                              values=values,
+                              activation=activation
+                              )
             
             self.layers.append(layer)
 
+        self.cost_function = cost_function
         self.debug_cost_list = []
     
     def calculate_and_predict(self, input: np.ndarray) -> np.ndarray:
@@ -96,6 +110,9 @@ class Model:
     def evaluate(self, inputs: np.ndarray, outputs: np.ndarray):
         acc = 0
         cost = 0
+
+        if self.cost_function == "cross_entropy":
+            pass
 
         for i, input in enumerate(inputs):
             output = outputs[i]
@@ -148,10 +165,15 @@ class Model:
         
     
     def train_iter(self, input: np.ndarray, output: np.ndarray):
-        prediction = self.calculate_and_predict(input)
-        raw_costs = prediction - output
+        if self.cost_function == "cross_entropy":
+            pass
+        elif self.cost_function == "mse":
+            prediction = self.calculate_and_predict(input)
+            raw_costs = prediction - output
 
         start_layer_index = len(self.layers)-1
+
+        pass
 
         # BACKPROPAGATION
         for layer_index in range(start_layer_index, -1, -1): # layer index counting backwards
@@ -164,7 +186,10 @@ class Model:
 
             # 1. activations change
             if layer_index == start_layer_index:
-                CHANGE.activations = 2*raw_costs
+                if self.cost_function == "cross_entropy":
+                    pass
+                elif self.cost_function == "mean_squared_error":
+                    CHANGE.activations = 2*raw_costs
             else:
                 SUCCEEDING_LAYER = self.layers[layer_index+1]
                 SUCCEEDING_CHANGE = SUCCEEDING_LAYER.changes[-1]
@@ -173,8 +198,11 @@ class Model:
                         CHANGE.activations[current_index] += SUCCEEDING_CHANGE.weighted_sum[succeeding_index] * SUCCEEDING_LAYER.values.weights[succeeding_index][current_index]
 
             # 2. weighted sum changes
-            if LAYER.activation_function == "sigmoid":
-                CHANGE.weighted_sum = np.multiply(CHANGE.activations, em.sigmoid_derivative(LAYER.values.weighted_sum))
+            if layer_index == start_layer_index and self.cost_function == "cross_entropy" and LAYER.activation_function == "softmax":
+                CHANGE.weighted_sum = em.derivative_cross_entropy_cost_times_derivative_softmax(LAYER.values.activations, output)
+            else:
+                if LAYER.activation_function == "sigmoid":
+                    CHANGE.weighted_sum = np.multiply(CHANGE.activations, em.sigmoid_derivative(LAYER.values.weighted_sum))
 
             # 3. weight changes
             PRECEDING_LAYER = self.layers[layer_index-1]
@@ -186,4 +214,3 @@ class Model:
             CHANGE.biases = CHANGE.weighted_sum
 
             LAYER.changes.append(CHANGE)
-            pass

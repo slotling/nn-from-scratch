@@ -18,8 +18,13 @@ models = []
 
 import matplotlib.pyplot as plt
 for alpha in [1]:
-    model = md.Model([X_train.shape[1], 16, 16, y_train.shape[1]])
-    model.train(X_train, y_train, alpha=alpha, epoches=100)
+    model = md.Model([
+        md.LayerDeclaration(X_train.shape[1]),
+        md.LayerDeclaration(16),
+        md.LayerDeclaration(16),
+        md.LayerDeclaration(y_train.shape[1], activation_function="softmax")
+    ])
+    model.train(X_train, y_train, alpha=alpha, epoches=50)
     print(model.calculate_and_predict(X_test[0]), y_test[0])
     plt.plot(model.debug_cost_list, label=f"alpha = {alpha}")
 plt.legend()

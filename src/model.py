@@ -31,7 +31,7 @@ class LayerData:
             raise Exception("Incorrect activations shape")
 
 class Layer:
-    def __init__(self, neurons: int, prev_neurons: int | None, activation="sigmoid", values: LayerData | None = None):
+    def __init__(self, neurons: int, prev_neurons: int | None, activation_function="sigmoid", values: LayerData | None = None):
         self.is_input_layer:bool = prev_neurons == None
         self.values: LayerData = LayerData(neurons, prev_neurons, self.is_input_layer, random=True) if values == None else values
         
@@ -40,7 +40,7 @@ class Layer:
 
         self.neurons = neurons
         self.prev_neurons = prev_neurons
-        self.activation_function = activation
+        self.activation_function = activation_function
 
     def input_data(self, data: np.ndarray):
         if not self.is_input_layer:
@@ -59,18 +59,26 @@ class Layer:
         
         if self.activation_function == "sigmoid":
             self.values.activations = em.sigmoid(self.values.weighted_sum)
+        elif self.activation_function == "softmax":
+            self.values.activations = em.softmax(self.values.weighted_sum)
+
+class LayerDeclaration():
+    def __init__(self, neurons:int, activation_function:str=None, values:LayerData=None):
+        self.neurons = neurons
+        self.activation_function = activation_function
+        self.values = values
 
 class Model:
-    def __init__(self, neurons_list: list[int], values_list: None | list[LayerData] = None):
+    def __init__(self, layers_info: list[LayerDeclaration], cost_function="cross_entropy"):
+        self.cost_function = cost_function
+
         self.layers: list[Layer] = []
-        for i, count in enumerate(neurons_list):
-            layer: Layer = None
+        for i, declaration in enumerate(layers_info):
             if i == 0:
-                layer = Layer(count, None, values=None if values_list == None else values_list[i])
-            else:
-                layer = Layer(count, neurons_list[i-1], values=None if values_list == None else values_list[i])
-            
-            self.layers.append(layer)
+                self.layers.append(Layer(declaration.neurons, None, declaration.activation_function, declaration.values))
+                continue
+
+            self.layers.append(Layer(declaration.neurons, layers_info[i-1].neurons, declaration.activation_function, declaration.values))
 
         self.debug_cost_list = []
     
@@ -97,20 +105,28 @@ class Model:
         acc = 0
         cost = 0
 
+        avg_acc = 0
+        avg_cost = 0
+
         for i, input in enumerate(inputs):
             output = outputs[i]
             prediction = self.calculate_and_predict(input)
 
             choice_index = prediction.argmax(axis=0)
             if output[choice_index] == 1:
-                acc += 1
-            
-            cost += np.sum(np.square(prediction - output))
-        
-        acc /= len(inputs)
-        cost /= len(inputs)
+                avg_acc += 1
 
-        return acc, cost
+            # cost calculation
+            if self.cost_function == "mse":
+                avg_cost += np.sum(np.square(prediction - output))
+            elif self.cost_function == "cross_entropy":
+                avg_cost += -np.sum(output * np.log(prediction))
+
+        avg_acc /= len(inputs)
+        avg_cost /= len(inputs)
+            
+
+        return avg_acc, avg_cost
     
     def train_epoch(self, inputs: np.ndarray, outputs: np.ndarray, alpha:np.float64, bar, epoch):
         for i, LAYER in enumerate(self.layers):
@@ -164,7 +180,10 @@ class Model:
 
             # 1. activations change
             if layer_index == start_layer_index:
-                CHANGE.activations = 2*raw_costs
+                if self.cost_function == "mse":
+                    CHANGE.activations = 2*raw_costs
+                else:
+                    pass # ignore
             else:
                 SUCCEEDING_LAYER = self.layers[layer_index+1]
                 SUCCEEDING_CHANGE = SUCCEEDING_LAYER.changes[-1]
@@ -173,8 +192,10 @@ class Model:
                         CHANGE.activations[current_index] += SUCCEEDING_CHANGE.weighted_sum[succeeding_index] * SUCCEEDING_LAYER.values.weights[succeeding_index][current_index]
 
             # 2. weighted sum changes
-            if LAYER.activation_function == "sigmoid":
-                CHANGE.weighted_sum = np.multiply(CHANGE.activations, em.sigmoid_derivative(LAYER.values.weighted_sum))
+            if LAYER.activation_function == "softmax" and self.cost_function == "cross_entropy" and layer_index == start_layer_index:
+                CHANGE.weighted_sum = prediction - output
+            elif LAYER.activation_function == "sigmoid":
+                CHANGE.weighted_sum = CHANGE.activations * em.sigmoid_derivative(LAYER.values.weighted_sum)
 
             # 3. weight changes
             PRECEDING_LAYER = self.layers[layer_index-1]

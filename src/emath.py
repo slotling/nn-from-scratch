@@ -9,3 +9,9 @@ def sigmoid_derivative(z: np.float64 | np.ndarray):
 def softmax(z: np.ndarray):
     e_x = np.exp(z - np.max(z))
     return e_x / e_x.sum(axis=0)
+
+def relu(z: np.float64 | np.ndarray):
+    return z * z > 0
+
+def relu_derivative(z: np.float64 | np.ndarray):
+    return z > 0

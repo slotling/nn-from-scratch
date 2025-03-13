@@ -12,8 +12,8 @@ class LayerData:
         
         if not is_input_layer:
             if random: 
-                self.weights: np.ndarray = rng.randn(neurons, prev_neurons) if weights==None else weights
-                self.biases: np.ndarray = rng.randn(neurons) if biases==None else biases
+                self.weights: np.ndarray = rng.rand(neurons, prev_neurons) - 0.5 if weights==None else weights
+                self.biases: np.ndarray = rng.rand(neurons) - 0.5 if biases==None else biases
             else:
                 self.weights: np.ndarray = np.full((neurons, prev_neurons), 0.) if weights==None else weights
                 self.biases: np.ndarray = np.full((neurons, ), 0.) if biases==None else biases
@@ -62,6 +62,8 @@ class Layer:
         
         if self.activation_function == "sigmoid":
             self.values.activations = em.sigmoid(self.values.weighted_sum)
+        elif self.activation_function == "relu":
+            self.values.activations = em.relu(self.values.weighted_sum)
         elif self.activation_function == "softmax":
             self.values.activations = em.softmax(self.values.weighted_sum)
 
@@ -217,6 +219,8 @@ class Model:
                 CHANGE.weighted_sum = prediction - output
             elif LAYER.activation_function == "sigmoid":
                 CHANGE.weighted_sum = CHANGE.activations * em.sigmoid_derivative(LAYER.values.weighted_sum)
+            elif LAYER.activation_function == "relu":
+                CHANGE.weighted_sum = CHANGE.activations * em.relu_derivative(LAYER.values.weighted_sum)
 
             # 3. weight changes
             PRECEDING_LAYER = self.layers[layer_index-1]

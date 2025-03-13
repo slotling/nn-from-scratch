@@ -3,7 +3,7 @@ import numpy as np
 from dataload import load_csv
 
 train = np.array(load_csv("data/mnist_train.csv", 1))
-test = np.array(load_csv("data/mnist_test.csv", 5))
+test = np.array(load_csv("data/mnist_test.csv", 50))
 
 X_train = np.array(np.full((2, 2), 0))
 y_train = np.array(np.full((2, 100), 0))
@@ -24,7 +24,7 @@ model = md.Model([
     md.LayerDeclaration(16),
     md.LayerDeclaration(y_train.shape[1], activation_function="softmax")
 ])
-model.train(X_train, y_train, alpha=2, epoches=1500)
+model.train(X_train, y_train, alpha=1, epoches=1500)
 print(model.calculate_and_predict(X_train[0]))
 print(model.calculate_and_predict(X_train[1]))
 

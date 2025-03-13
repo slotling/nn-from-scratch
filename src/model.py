@@ -2,6 +2,7 @@ from alive_progress import alive_bar
 import numpy as np
 import emath as em
 from datetime import datetime
+import os
 
 class LayerData:
     def __init__(self, neurons: int, prev_neurons: int, is_input_layer=False, activations=None, weights=None, biases=None, weighted_sum=None, random=False):
@@ -71,7 +72,7 @@ class LayerDeclaration():
         self.values = values
 
 class Model:
-    def __init__(self, layers_info: list[LayerDeclaration]=None, cost_function="cross_entropy", premade_layers: list[Layer]=None):
+    def __init__(self, layers_info: list[LayerDeclaration]=None, cost_function="cross_entropy", premade_layers: list[Layer]=None, preload_file: str = None):
         self.layers_info = layers_info
         
         self.cost_function = cost_function
@@ -237,6 +238,19 @@ class Model:
     def util_write_params(self):
         now = datetime.now()
         dt_string = now.strftime("%Y/%m/%d %H.%M.%S")
-        np.savez(f'parameters/{dt_string}')   # X is an array
 
+        if not os.path.exists(f"parameters/{dt_string}/"):
+            os.makedirs(f"parameters/{dt_string}/")
+        
+        for i, LAYER in enumerate(self.layers):
+            if i==0:
+                continue
+            
+            pathw = f"parameters/{dt_string}/{i}_w.txt"
+            pathb = f"parameters/{dt_string}/{i}_b.txt"
+            open(pathw, 'a').close()
+            open(pathb, 'a').close()
+
+            np.savetxt(pathw, LAYER.values.weights)
+            np.savetxt(pathb, LAYER.values.biases)
 

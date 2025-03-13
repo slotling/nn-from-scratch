@@ -71,9 +71,15 @@ class LayerDeclaration():
         self.activation_function = activation_function
         self.values = values
 
+class TrainDeclaration():
+    def __init__(self, alpha, epoches):
+        self.alpha = alpha
+        self.epoches = epoches
+
 class Model:
-    def __init__(self, layers_info: list[LayerDeclaration]=None, cost_function="cross_entropy", premade_layers: list[Layer]=None, preload_file: str = None):
+    def __init__(self, layers_info: list[LayerDeclaration], train_info: TrainDeclaration, cost_function="cross_entropy", premade_layers: list[Layer]=None, preload_folder: str = None):
         self.layers_info = layers_info
+        self.train_info = train_info
         
         self.cost_function = cost_function
 
@@ -87,6 +93,14 @@ class Model:
                     continue
 
                 self.layers.append(Layer(declaration.neurons, layers_info[i-1].neurons, declaration.activation_function, declaration.values))
+
+        if preload_folder != None:
+            for i, LAYER in enumerate(self.layers):
+                if i==0:
+                    continue
+
+                LAYER.values.weights = np.loadtxt(f"{preload_folder}/{i}_w.txt")
+                LAYER.values.biases = np.loadtxt(f"{preload_folder}/{i}_b.txt")
 
         self.debug_cost_list = []
         self.debug_acc_list = []
@@ -105,10 +119,16 @@ class Model:
 
         return self.layers[-1].values.activations
     
-    def train(self, inputs: np.ndarray, outputs: np.ndarray, alpha=0.01, epoches=200):
-        with alive_bar(epoches * (inputs.shape[0] + len(self.layers)-1)) as bar:
-            for i in range(epoches):
-                self.train_epoch(inputs, outputs, alpha=alpha, bar=bar, epoch=i)
+    def train(self, inputs: np.ndarray, outputs: np.ndarray):
+        with alive_bar(self.train_info.epoches * (inputs.shape[0] + (len(self.layers)-1))) as bar:
+            for i in range(self.train_info.epoches):
+                self.train_epoch(inputs, outputs, bar=bar, epoch=i)
+
+                acc, cost = self.evaluate(inputs, outputs)
+                self.debug_cost_list.append(cost)
+                self.debug_acc_list.append(acc)
+
+                bar.text(f"acc: {acc}, cost: {cost}, iter: {i}")
     
     def return_cost(self, prediction, output):
         if self.cost_function == "mse":
@@ -136,7 +156,7 @@ class Model:
 
         return avg_acc, avg_cost
     
-    def train_epoch(self, inputs: np.ndarray, outputs: np.ndarray, alpha:np.float64, bar, epoch):
+    def train_epoch(self, inputs: np.ndarray, outputs: np.ndarray, bar, epoch):
         for i, LAYER in enumerate(self.layers):
             if i == 0:
                 continue
@@ -160,16 +180,10 @@ class Model:
             biases_changes = np.array([CHANGE.biases for CHANGE in LAYER.changes])
             pass
 
-            LAYER.values.weights -= np.average(weights_changes, axis=0) * alpha
-            LAYER.values.biases -= np.average(biases_changes, axis=0) * alpha
+            LAYER.values.weights -= np.average(weights_changes, axis=0) * self.train_info.alpha
+            LAYER.values.biases -= np.average(biases_changes, axis=0) * self.train_info.alpha
 
             bar()
-        
-        acc, cost = self.evaluate(inputs, outputs)
-        self.debug_cost_list.append(cost)
-        self.debug_acc_list.append(acc)
-
-        bar.text(f"acc: {acc}, cost: {cost}, iter: {epoch}")
         
     
     def train_iter(self, input: np.ndarray, output: np.ndarray):
@@ -237,7 +251,7 @@ class Model:
     
     def util_write_params(self):
         now = datetime.now()
-        dt_string = now.strftime("%Y/%m/%d %H.%M.%S")
+        dt_string = now.strftime("%Y-%m-%d %H.%M.%S")
 
         if not os.path.exists(f"parameters/{dt_string}/"):
             os.makedirs(f"parameters/{dt_string}/")

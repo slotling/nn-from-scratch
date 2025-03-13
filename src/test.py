@@ -24,7 +24,7 @@ model = md.Model([
     md.LayerDeclaration(16),
     md.LayerDeclaration(y_train.shape[1], activation_function="softmax")
 ])
-model.train(X_train, y_train, alpha=2, epoches=500)
+model.train(X_train, y_train, alpha=2, epoches=1500)
 print(model.calculate_and_predict(X_train[0]))
 print(model.calculate_and_predict(X_train[1]))
 

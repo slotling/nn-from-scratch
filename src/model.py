@@ -1,6 +1,7 @@
 from alive_progress import alive_bar
 import numpy as np
 import emath as em
+from datetime import datetime
 
 class LayerData:
     def __init__(self, neurons: int, prev_neurons: int, is_input_layer=False, activations=None, weights=None, biases=None, weighted_sum=None, random=False):
@@ -37,6 +38,7 @@ class Layer:
         
         if not self.is_input_layer:
             self.changes: list[LayerData] = []
+            self.debug_changes: list[LayerData] = []
 
         self.neurons = neurons
         self.prev_neurons = prev_neurons
@@ -63,24 +65,30 @@ class Layer:
             self.values.activations = em.softmax(self.values.weighted_sum)
 
 class LayerDeclaration():
-    def __init__(self, neurons:int, activation_function:str=None, values:LayerData=None):
+    def __init__(self, neurons:int, activation_function:str="sigmoid", values:LayerData=None):
         self.neurons = neurons
         self.activation_function = activation_function
         self.values = values
 
 class Model:
-    def __init__(self, layers_info: list[LayerDeclaration], cost_function="cross_entropy"):
+    def __init__(self, layers_info: list[LayerDeclaration]=None, cost_function="cross_entropy", premade_layers: list[Layer]=None):
+        self.layers_info = layers_info
+        
         self.cost_function = cost_function
 
-        self.layers: list[Layer] = []
-        for i, declaration in enumerate(layers_info):
-            if i == 0:
-                self.layers.append(Layer(declaration.neurons, None, declaration.activation_function, declaration.values))
-                continue
+        if layers_info == None:
+            self.layers = premade_layers
+        else:
+            self.layers: list[Layer] = []
+            for i, declaration in enumerate(layers_info):
+                if i == 0:
+                    self.layers.append(Layer(declaration.neurons, None, None, declaration.values))
+                    continue
 
-            self.layers.append(Layer(declaration.neurons, layers_info[i-1].neurons, declaration.activation_function, declaration.values))
+                self.layers.append(Layer(declaration.neurons, layers_info[i-1].neurons, declaration.activation_function, declaration.values))
 
         self.debug_cost_list = []
+        self.debug_acc_list = []
     
     def calculate_and_predict(self, input: np.ndarray) -> np.ndarray:
         # FEEDFORWARD
@@ -100,11 +108,14 @@ class Model:
         with alive_bar(epoches * (inputs.shape[0] + len(self.layers)-1)) as bar:
             for i in range(epoches):
                 self.train_epoch(inputs, outputs, alpha=alpha, bar=bar, epoch=i)
-        
-    def evaluate(self, inputs: np.ndarray, outputs: np.ndarray):
-        acc = 0
-        cost = 0
+    
+    def return_cost(self, prediction, output):
+        if self.cost_function == "mse":
+            return np.sum(np.square(prediction - output))
+        elif self.cost_function == "cross_entropy":
+            return -np.sum(output * np.log(prediction))
 
+    def evaluate(self, inputs: np.ndarray, outputs: np.ndarray):
         avg_acc = 0
         avg_cost = 0
 
@@ -117,14 +128,10 @@ class Model:
                 avg_acc += 1
 
             # cost calculation
-            if self.cost_function == "mse":
-                avg_cost += np.sum(np.square(prediction - output))
-            elif self.cost_function == "cross_entropy":
-                avg_cost += -np.sum(output * np.log(prediction))
+            avg_cost += self.return_cost(prediction, output)
 
         avg_acc /= len(inputs)
         avg_cost /= len(inputs)
-            
 
         return avg_acc, avg_cost
     
@@ -159,6 +166,7 @@ class Model:
         
         acc, cost = self.evaluate(inputs, outputs)
         self.debug_cost_list.append(cost)
+        self.debug_acc_list.append(acc)
 
         bar.text(f"acc: {acc}, cost: {cost}, iter: {epoch}")
         
@@ -177,7 +185,7 @@ class Model:
                 continue
             
             CHANGE = LayerData(LAYER.neurons, LAYER.prev_neurons, is_input_layer=False, random=False)
-
+            
             # 1. activations change
             if layer_index == start_layer_index:
                 if self.cost_function == "mse":
@@ -187,9 +195,7 @@ class Model:
             else:
                 SUCCEEDING_LAYER = self.layers[layer_index+1]
                 SUCCEEDING_CHANGE = SUCCEEDING_LAYER.changes[-1]
-                for current_index in range(LAYER.neurons):
-                    for succeeding_index in range(SUCCEEDING_LAYER.neurons):
-                        CHANGE.activations[current_index] += SUCCEEDING_CHANGE.weighted_sum[succeeding_index] * SUCCEEDING_LAYER.values.weights[succeeding_index][current_index]
+                CHANGE.activations = np.dot(SUCCEEDING_LAYER.values.weights.T, SUCCEEDING_CHANGE.weighted_sum)
 
             # 2. weighted sum changes
             if LAYER.activation_function == "softmax" and self.cost_function == "cross_entropy" and layer_index == start_layer_index:
@@ -199,12 +205,38 @@ class Model:
 
             # 3. weight changes
             PRECEDING_LAYER = self.layers[layer_index-1]
-            for current_index in range(LAYER.neurons):
-                for preceding_index in range(PRECEDING_LAYER.neurons):
-                    CHANGE.weights[current_index][preceding_index] = CHANGE.weighted_sum[current_index] * PRECEDING_LAYER.values.activations[preceding_index]
+            CHANGE.weights = np.dot(np.array([CHANGE.weighted_sum]).T, np.array([PRECEDING_LAYER.values.activations]))
 
             # 4. bias changes
             CHANGE.biases = CHANGE.weighted_sum
 
             LAYER.changes.append(CHANGE)
-            pass
+            
+            # # gradient checking
+            # DEBUG_CHANGE = LayerData(LAYER.neurons, LAYER.prev_neurons, is_input_layer=False, random=False) 
+            # for i, _ in enumerate(DEBUG_CHANGE.weights):
+            #     for j, _ in enumerate(DEBUG_CHANGE.weights[i]):
+            #         CLONE_MODEL = self.clone_model()
+            #         cost1 = CLONE_MODEL.return_cost(CLONE_MODEL.calculate_and_predict(input), output)
+            #         CLONE_MODEL.layers[layer_index].values.weights[i][j] += 0.000001 # small change
+            #         cost2 = CLONE_MODEL.return_cost(CLONE_MODEL.calculate_and_predict(input), output)
+            #         DEBUG_CHANGE.weights[i][j] = cost2 - cost1
+
+            # for i, _ in enumerate(DEBUG_CHANGE.biases):
+            #     CLONE_MODEL = self.clone_model()
+            #     cost1 = CLONE_MODEL.return_cost(CLONE_MODEL.calculate_and_predict(input), output)
+            #     CLONE_MODEL.layers[layer_index].values.biases[i] += 0.000001 # small change
+            #     cost2 = CLONE_MODEL.return_cost(CLONE_MODEL.calculate_and_predict(input), output)
+            #     DEBUG_CHANGE.biases[i] = cost2 - cost1
+            
+            # LAYER.debug_changes.append(DEBUG_CHANGE)
+
+    def util_clone_model(self):
+        return Model(premade_layers=self.layers)
+    
+    def util_write_params(self):
+        now = datetime.now()
+        dt_string = now.strftime("%Y/%m/%d %H.%M.%S")
+        np.savez(f'parameters/{dt_string}')   # X is an array
+
+
